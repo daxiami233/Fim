@@ -1,0 +1,23 @@
+{
+    "targetProjectName": "test project",
+    "targetProjectDirectory1": "D:/ProjectData/HMProjects/SE4OpenHarmony/github/homework-tasklist-v2/",
+    "targetProjectDirectory2": "D:/ProjectData/HMProjects/DemoOfRouter/HMRouter-master",
+    "targetProjectDirectory3": "D:/ProjectData/HMProjects/DemoOfRouter/navigation-router-master",
+    "targetProjectDirectory4": "D:/ProjectData/HMProjects/DemoOfRouter/system-router-map-master",
+    "targetProjectDirectory5": "D:/ProjectData/HMProjects/Wechat_HarmonyOS",
+    "targetProjectDirectory": "D:/ProjectData/HMProjects/SE4OpenHarmony/github/ArkTS-wphui1.0/",
+
+    "logPath": "arkanalyzer/ArkAnalyzer.log",
+    "logLevel": "INFO",
+    "sdks": [
+        {
+            "name": "etsSdk",
+            "path": "C:\\Users\\79940\\AppData\\Local\\Huawei\\Sdk\\openharmony\\9\\ets",
+            "moduleName": ""
+        }
+    ],
+
+    "options": {
+        "enableLeadingComments": true
+    }
+}

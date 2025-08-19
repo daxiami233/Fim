@@ -1,0 +1,12 @@
+{
+    "targetProjectName": "homework-tasklist-v2/",
+    "targetProjectDirectory": "/Users/hejl/DevEcoStudioProjects/MyApplication2/",
+    "logPath": "arkanalyzer/ArkAnalyzer.log",
+    "logLevel": "INFO",
+    "sdks": [
+    ],
+
+    "options": {
+        "enableLeadingComments": true
+    }
+}

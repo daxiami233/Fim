@@ -1,0 +1,10 @@
+{
+  "pages/Index": [
+    {
+      "component": "//root[1]/Column[1]/Column[1]/Tabs[1]/Swiper[1]/TabContent[1]/WaterFlow[1]/FlowItem[1]",
+      "action": "click",
+      "targetPage": "pages/components/CardDetailPage"
+    }
+  ],
+  "pages/components/CardDetailPage": []
+}

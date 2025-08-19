@@ -1,0 +1,19 @@
+{
+    "targetProjectName": "AppSampleD",
+    "targetProjectDirectory": "D:/ProjectData/HMProjects/ZRouter/",
+
+    "logPath": "log/ArkAnalyzer.log",
+    "logLevel": "INFO",
+    
+    "sdks": [
+        {
+            "name": "etsSdk",
+            "path": "C:\\Users\\79940\\AppData\\Local\\Huawei\\Sdk\\openharmony\\9\\ets",
+            "moduleName": ""
+        }
+    ],
+
+    "options": {
+        "enableLeadingComments": true
+    }
+}

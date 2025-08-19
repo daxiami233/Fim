@@ -1,0 +1,41 @@
+{
+  "name": "ptganalyzer",
+  "version": "1.0.0",
+  "main": "index.js",
+  "files": [
+    "docs",
+    "lib",
+    "config"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepack": "tsc -p ./tsconfig.prod.json",
+    "test": "npm run copyCollectionDefintion && vitest",
+    "testonce": "vitest --no-color run",
+    "coverage": "vitest run --coverage",
+    "heapdump": "npm run build && node --expose-gc out/tests/HeapDumpTest.js",
+    "gendoc": "npx typedoc",
+    "postinstall": "node script/npmInstall.js",
+    "copyCollectionDefintion": "ts-node script/typescriptCollectionDefinitionCopy.ts"
+  },
+  "dependencies": {
+    "commander": "11.0.0",
+    "json5": "^2.2.3",
+    "log4js": "6.7.1",
+    "ohos-typescript": "^4.9.5-r6"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "bundledDependencies": [
+    "ohos-typescript"
+  ],
+  "devDependencies": {
+    "@types/json5": "^2.2.0",
+    "@vitest/coverage-v8": "^1.5.0",
+    "ts-node": "^10.9.1",
+    "typedoc": "^0.25.13",
+    "vitest": "^1.5.0"
+  }
+}

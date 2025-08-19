@@ -1,0 +1,14 @@
+{
+    "$schema": "https://typedoc.org/schema.json",
+    "name": "ArkAnalyzer",
+    "categoryOrder": [
+        "*"
+    ],
+    "entryPoints": [
+        "./src/index.ts"
+    ],
+    "excludeInternal": true,
+    "useTsLinkResolution": true,
+    "out": "doc",
+    "readme": "./README.en.md"
+}

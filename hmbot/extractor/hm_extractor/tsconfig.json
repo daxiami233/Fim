@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.main.json",
+  "include": [
+    // "index.ts",
+    "src/**/*",
+    // "tests/ptgTest/**/*",
+    "main/**/*",
+  ],
+  "compilerOptions": {
+      "outDir": "./out",
+      "noUnusedLocals": false, // 确保未使用的局部变量检查已禁用
+      "noUnusedParameters": false // 确保未使用的参数检查已禁用
+  }
+}
