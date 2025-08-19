@@ -76,10 +76,20 @@ class PageNode:
                 
                 if explored['is_effective']:
                     to_page = explored['to_page_index']
-                    prompt_str += f"    - [Action: '{action_desc}'] -> Page {to_page}\n"
+                    prompt_str += f"    - [Action on Widget {widget_idx}: '{action_desc}'] -> Page {to_page}\n"
                 else:
                     reason = explored.get('reason', 'No change detected')
-                    prompt_str += f"    - [Action: '{action_desc}'] -> (Ineffective: {reason})\n"
+                    prompt_str += f"    - [Action on Widget {widget_idx}: '{action_desc}'] -> (Ineffective: {reason})\n"
+
+        # Format available widgets
+        prompt_str += "  - Available Widgets:\n"
+        if not self.available_widgets:
+            prompt_str += "    (All widgets on this page have been interacted with)\n"
+        else:
+            for widget in self.available_widgets:
+                widget_desc = widget['description']
+                widget_idx = widget['index']
+                prompt_str += f"    - Widget {widget_idx}: '{widget_desc}'\n"
         
         return prompt_str
  
@@ -96,23 +106,40 @@ class PathExplorer:
         self.summarized_strategies = []
 
     def get_page_info(self, page: Page, index: int):
-        prompt = f'''你是一位观察力极其敏锐的UI分析专家。我会上传一张安卓App的界面截图，请你用一段自然流畅的文字，为我详细描述这个界面。
+        prompt = f'''你是一位精通UI分析的专家。我会上传一张安卓App的界面截图，请严格按照以下规则分析这张图片：
 
-你的描述需要像一幅“文字快照”，捕捉到所有关键信息和视觉细节，目标是让任何没有看到图片的人都能通过你的描述在脑海中清晰地构想出这个界面，并能轻易地将它与其他界面区分开来。
+1. **简短界面描述**：对整个页面进行简短描述，包括页面的主要功能、整体布局结构、页面所属的应用类型或功能模块，以及页面的独特特征（用于区分其他界面）。
+2. **控件识别**：找出图片中所有可以被用户点击的控件，如按钮、图标、输入框、整行的列表项目等。
+3. **忽略顶部**：完全忽略设备最顶部的系统状态栏（即显示时间、信号、电量的部分）。
+4. **整合信息**：对于一个独立的、可点击的列表项（list item），请将其中的所有文字信息（如标题、摘要、价格、日期等）合并到同一个description中，不要将它们拆分成多个条目。对于非列表项的独立控件，如单个按钮、图标或输入框，则按其自身的功能进行描述，不与其他信息整合。
 
-请严格遵循以下描述要点：
+请将结果严格按照以下JSON格式返回：
+{{
+  "page_description": "对整个页面的详细描述，包含独特特征用于区分其他界面",
+  "clickable_elements": [
+    {{
+      "index": 1,
+      "description": "对控件的完整、整合后的描述"
+    }}
+  ]
+}}
 
-1.  **核心功能与布局**：首先，一句话总结这个页面的核心功能（例如：“这是一个用于编辑个人资料的页面”）。然后，描述它的整体布局结构（例如：“页面采用经典的上下布局，顶部是导航栏，中间是内容区，底部是操作按钮”）。
+**示例:**
+{{
+  "page_description": "这是一个电商应用的商品详情页面，页面顶部有返回按钮和分享按钮，中间展示商品图片和详细信息，底部有加入购物车和立即购买按钮。页面背景为白色，商品图片占据页面上半部分。",
+  "clickable_elements": [
+    {{
+      "index": 1,
+      "description": "页面顶部左侧的返回箭头按钮"
+    }},
+    {{
+      "index": 2,
+      "description": "页面底部的蓝色'加入购物车'按钮"
+    }}
+  ]
+}}
 
-2.  **关键视觉元素**：详细描述页面上最醒目的视觉元素。这可能是一张大图、一个特殊的图表、一个用户的头像、或是一个色彩鲜艳的插图。请具体说明它是什么以及它在什么位置。
-
-3.  **重要文本内容**：提取并引用页面上的关键标题、标签或按钮上的文字。例如，页面顶部标题是“我的购物车”，或者一个按钮上写着“确认支付”。这些具体的文本是区分页面的重要线索。
-
-4.  **忽略状态栏**：在描述中，请完全忽略设备最顶部的系统状态栏（显示时间、信号、电量的部分）。
-
-请将以上所有信息整合为一段连贯的描述性文字，直接返回这段文字即可，**绝对不要使用任何代码或JSON格式**。
-
-现在，请开始分析我上传的截图。'''
+现在，请分析我上传的截图，并返回有效的JSON格式数据。'''
         content = HumanMessage(
             content=[
                 {
@@ -128,18 +155,37 @@ class PathExplorer:
             ]
         )
         response = self.llm.invoke([content]).content
+        # 处理可能包含```json前缀和后缀的返回数据
+        if response.strip().startswith('```json'):
+            # 使用正则表达式提取JSON内容
+            json_match = re.search(r'```json\s*([\s\S]*?)\s*```', response)
+            if json_match:
+                response = json_match.group(1)
+            else:
+                # 如果没有找到结束标记，就去掉开头的```json
+                response = response.strip()[7:].strip()
+        elif response.strip().startswith('```'):
+            # 处理只有```的情况
+            json_match = re.search(r'```\s*([\s\S]*?)\s*```', response)
+            if json_match:
+                response = json_match.group(1)
+            else:
+                response = response.strip()[3:].strip()
+        
+        response_json = json.loads(response)
         
         # 构造新的PageNode对象
         page_node = PageNode(
             index=index,
             page=page,
-            page_description=response
+            page_description=response_json.get('page_description', ''),
+            widget_list=response_json.get('clickable_elements', [])
         )
         
         return page_node
     
     def get_next_operation(self, target: str, verification_feedback: dict = None):
-        # 构建所有页面的详细信息，包括已探索的动作
+        # 构建所有页面的详细信息，包括已探索和未探索的动作
         app_map_str = ""
         for page_node in self.pages:
             app_map_str += page_node.to_prompt_string() + "\n"
@@ -151,50 +197,66 @@ class PathExplorer:
         feedback_section = ""
         if verification_feedback:
             feedback_section = f'''
+## 上一步操作反馈
 - **操作有效性**: {verification_feedback.get('operation_effective')} (原因: {verification_feedback.get('effectiveness_reason')})
 '''
 
         # 构建已总结的策略信息
         strategies_section = ""
         if self.summarized_strategies:
-            strategies_section = ""
+            strategies_section = "## 已总结的成功策略\n"
             for i, strategy in enumerate(self.summarized_strategies):
                 strategies_section += f"{i+1}. {strategy}\n"
         
-        prompt = f'''你是一个专业的移动UI自动化测试专家，你的核心任务是根据探索目标和历史记录，构思并描述出最合理的下一步操作，以最终找到所有可能到达目标的路径。
+        prompt = f'''你是一个专业的移动UI自动化测试专家，你的核心任务是根据探索目标，设计并执行一系列操作，以寻找所有可能到达目标的路径。
 
 ## 探索目标
+你的核心目标是找到一条路径，以达到以下目标状态：
 **{target}**
-
-## App探索记录
-这是一个结构化的记录，展示了你已访问过的页面以及在每个页面上执行过的操作。请仔细分析，特别是当前页面已经执行过的操作。
+{feedback_section}
+{strategies_section}
+## App探索地图
 {app_map_str}
 
-## 上一步操作反馈
-{feedback_section}
+## 当前状态
+- **你当前位于**: Page {self.curr_page_index}
 
-## 已完成的路径摘要
-这里总结了已经成功到达目标的路径，你的任务是寻找与这些路径不同的新方法。
-{strategies_section}
+## 决策原则 (请严格遵守!)
+1.  **键盘优先**: 如果当前界面中出现了键盘，请忽略其他所有规则，立即选择一个输入框，并将操作描述设为“文本框里输入”。
+2.  **理解功能路径**: “已总结的成功策略”描述的是**功能性**路径，而非具体控件的路径。例如，策略“我是通过点击联系人列表中的一个用户头像进入其主页的”意味着“点击任意用户头像”这条**功能路径**已经被探索过了。
+    *   你的首要任务是找到一条在**功能上**与“已总结的成功策略”和“已探索动作”**完全不同**的新路径来达成“{target}”。
 
-## 决策原则
-1.  **目标导向**：你的首要任务是构思一个最有可能让你更接近探索目标“**{target}**”的操作。请结合当前界面截图和探索目标进行判断。
+3.  **杜绝功能重复**:
+    *   **识别功能等价操作**: 在选择“Available Widgets”中的控件时，要先判断这个操作在功能上是否与已成功的策略重复。如果一个策略是“点击列表项进入详情页”，那么在当前页面点击任意一个相似的列表项都属于**功能重复**，应当避免。
+    *   **禁止直接返回**: 避免选择一个会让你立即返回上一个页面的动作（例如，从Page 1到Page 2后，又在Page 2点击“返回”回到Page 1），除非当前页面没有其他任何可用的、有意义的控件。
 
-2.  **避免无效重复**：
-    * 请仔细查阅“App探索记录”中针对**当前页面**已执行过的操作列表。
-    * **避免**构思一个与历史记录中**完全相同**的操作。例如，如果记录显示你已经点击过“用户A的头像”，那么就不应再次生成“点击用户A的头像”这个操作。
-    * **允许**执行功能相关但目标不同的操作。例如，即使你已经点击过“用户A的头像”，但如果界面上还有“用户B的头像”，那么“点击用户B的头像”是一个有效的、可探索的新操作。
+4.  **优先目标**:
+    *   在遵守上述规则的前提下，从当前页面的“Available Widgets”列表中，选择一个与探索目标“**{target}**”最相关的操作。
 
-3.  **探索未知**：如果当前界面没有与目标直接相关的操作，或者相关操作均已执行过，请构思一个最有可能带你进入**新界面**或**未探索功能区**的操作。
+5.  **探索未知**:
+    *   如果没有直接相关的控件，就从“Available Widgets”中选择一个最有可能带你进入**新界面**或**未探索功能区**的控件。
 
-4.  **禁止无效返回**：避免执行会立刻返回上一个页面的操作（如点击常规的“返回”按钮），除非当前页面没有其他任何有意义的、可探索的操作。
+6.  **严格遵守列表**:
+    *   你的选择**必须**严格来自当前页面的“Available Widgets”列表。
 
-现在，请根据你对当前界面截图的理解，并严格遵循以上决策原则，用一句话返回你构思的下一步操作。
+请严格按照以下JSON格式返回你的选择，不要包含任何额外的解释：
 
-**返回要求：**
-- 直接返回操作的文本描述。
-- 必须以动词开头（如：点击、输入、滑动等）。
-- 不要包含任何解释、编号、JSON格式或额外说明。
+```json
+{{
+  "think": "在这里简要描述你的思考过程（50字以内），说明为什么选择这个操作，并确认它在功能上不是重复的。",
+  "index": "选中的控件索引",
+  "description": "对操作的描述，必须以动词开头，例如'点击返回按钮'、'输入用户名'或'滑动列表'。"
+}}
+```
+
+**返回示例:**
+```json
+{{
+  "think": "之前的策略是通过点击头像进入主页，现在我选择点击'设置'按钮，这是一个功能上全新的路径。",
+  "index": "5",
+  "description": "点击'设置'按钮"
+}}
+```
 '''
         content = HumanMessage(
             content=[
@@ -647,7 +709,6 @@ class PathExplorer:
         for page_node in self.pages:
             final_map_str += page_node.to_prompt_string() + "\n"
         logger.info(f"=========== 最终探索地图 ===========\n{final_map_str}")
-
 
     def execute_operations_continuous_dialogue(self, operation_description: str):
         page = self.device.dump_page(refresh=True)
