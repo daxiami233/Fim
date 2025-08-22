@@ -1,93 +1,170 @@
-verify_ptg_system_prompt = """You are a professional mobile UI automation testing expert.
-You need to determine whether the page transition is correct.
-I will give you three images: the first is the page before event execution (before), the second is the expected page after PTG event execution (after), and the third is the page obtained after actual event execution (actual after).
+page_abstract_prompt = f'''你是一位高效的UI摘要专家。我会上传一张安卓App的界面截图，请你为其生成一个**简短且具有唯一性**的文字描述。
 
-**Verification Priority:**
-1. **First determine if the operation is effective**: Compare the first image (before) and the third image (actual after). If there is no change in the interface, it means the operation did not take effect, return no_change
-2. **Then determine if the transition is correct**: If the operation has taken effect, compare the second image (PTG after) and the third image (actual after) to determine whether it has transitioned to the correct interface
+这个描述应该像一个“文字指纹”，核心目标是**用最少的文字帮助我们快速区分这个页面和其他页面**。
 
-**Judgment Criteria:**
-- **Operation effectiveness judgment**: Whether the overall layout and structure of the interface have changed
-- **Interface matching judgment**: Only focus on whether the interface structure is the same, whether it is the same interface in the software
-- No need to consider whether the content is completely the same, text, numbers, time, images and other specific content can be different
-- As long as it is the same functional interface in the software (such as: the same settings page, the same list page, the same detail page, etc.), it is considered a match
+请严格遵循以下要求：
 
-Please return the results strictly in the following JSON format:
+1.  **核心功能**：首先，用一句话点明页面的核心功能或主题（例如：“这是一个商品详情页”或“用户登录与注册页面”）。
 
-{
-  "think": "Brief analysis: first determine if the operation is effective (1vs3), then determine if the interface matches (2vs3)",
-  "result": true/false,
-  "error_type": "no_change/wrong_page/null"
-}
+2.  **关键标识**：其次，提取并列出页面上**最关键、最独特的1-3个文本关键词**。例如，页面标题、关键按钮的文字、或独特的标签文本。这是区分页面的核心信息。
 
-Where:
-- think: Brief analysis process, analyzed according to verification priority
-- result: Boolean value, true means the operation is effective and transitions to the correct interface, false means there is a problem
-- error_type: Error category, fill in when result is false:
-  - "no_change": The operation did not take effect (the first and third images are basically the same)
-  - "wrong_page": The operation took effect but transitioned to the wrong interface (the first and third images are different, but the second and third images do not match)
-  - "null": Fill in null when result is true
+3.  **整合输出**：将以上信息整合为一段**极其简练**的描述性文字。
 
-Please ensure that the returned result is in valid JSON format."""
+4.  **必要规则**：
+    - 在描述中，请完全忽略设备最顶部的系统状态栏（显示时间、信号的部分）。
+    - 请直接返回这段文字，**绝对不要使用任何代码、JSON格式或列表符号**。
 
-generate_next_event_prompt = """You are a professional mobile UI automation testing expert.
-I need you to analyze screenshots before and after operations and generate corresponding operation descriptions with page transition information.
+现在，请开始分析我上传的截图。'''
 
-I will give you two images:
-First image: Interface screenshot before operation (before)
-Second image: Interface screenshot after operation (after)
+page_exist_prompt = f'''你是一位极其精通UI布局和模板识别的视觉分析专家。你的任务是判断“新截图”是否与“候选页面”中的任何一个共享相同的“界面模板”。
 
-Please analyze the differences between these two screenshots, infer what operations might have been performed from the first screenshot to the second screenshot, and generate specific operation descriptions along with page transition information.
+## 核心任务
+请仔细观察我上传的第一张“新截图”，并将其与后续的每一张“候选页面”截图进行逐一对比。你的目标是判断这个新截图，在结构和功能上，是否属于一个已经存在的页面类型。
 
-When analyzing, please consider:
-- Interface layout changes (page transitions, popup appearance/disappearance, etc.)
-- Element state changes (button highlighting, text changes, switch states, etc.)
-- Content changes (list item increase/decrease, input box content, etc.)
-- Scroll position changes
-- Focus or selection state changes
+## 判断原则：关注“模板”，忽略“数据”
+判断的核心在于“模板”而非“数据”。如果两个页面看起来像是用同一个模板渲染出来的，只是填充了不同的用户数据或动态内容，那么它们就应该被视为同一个界面。
 
-Please provide your analysis in the following format in Chinese:
+### 以下方面的“结构”必须保持一致：
+1.  **整体布局**：页面的宏观结构，如头部、主体、底部的划分和比例必须相似。
+2.  **核心组件**：主要功能模块（如信息流、用户资料卡、商品列表）的位置、类型和基本样式必须一致。
+3.  **导航元素**：顶部导航栏、底部标签栏、侧边栏菜单等的结构和图标必须一致。
+4.  **固定控件**：功能性按钮、搜索框、图标等非动态内容的位置和功能必须保持一致。
+5.  **页面状态**：是否存在软键盘、弹窗、对话框、加载动画等。一个有弹窗的页面和一个没有弹窗的页面是不同的界面状态。
 
-**界面转换描述：**
-从[源界面简要描述]转换到[目标界面简要描述]
+### 以下方面的“内容”差异应该被忽略：
+* **用户生成内容(UGC)**：不同的帖子、文章、图片、视频、评论等。
+* **用户特定数据**：不同的用户名、头像、昵称、粉丝数、个人简介等。
+* **动态列表/信息流**：列表中的具体项目或顺序不同。
+* **广告或推荐内容**：系统动态推荐的广告或内容。
+* **次要文本**：时间戳、观看次数、点赞数等动态变化的文本。
 
-**操作描述：**
-- 点击[具体位置]的[具体元素]
-- 向[方向]滑动
-- 输入文本"[具体内容]"
-- 长按[具体元素]
+## 输出指令
+请严格遵循以下JSON格式返回你的判断结果，不要包含任何理由或额外的解释：
+{{
+  "is_new": <true_or_false>,
+  "existing_index": <如果 is_new 为 false，请提供匹配的候选页面索引；如果为 true，则为 -1>
+}}
+'''
 
-**Notes:**
-- Do not click buttons with voice input functionality (such as microphone icons, voice buttons, etc.)
-- Prioritize text buttons or icon buttons for operations
-- Be specific about what type of pages/interfaces are shown in before and after screenshots
-- Describe the page transition in a clear and concise manner
+next_operation_prompt = '''你是一位顶尖的安卓自动化测试专家。你的核心目标是高效地探索一个App，以最快的速度发现并覆盖其核心功能页面。
 
-Please provide concise and clear descriptions in Chinese."""
+## 探索上下文
 
-generate_return_operation_prompt = """You are a professional mobile UI automation testing expert.
-I need you to analyze screenshots and PTG operation information to help the phone return from the current page to the target page.
+### 1. 当前状态
+你当前正位于 **Page {curr_page_index}**。
+在当前页面的截图上，你已经尝试过以下操作：
+{explored_ops_str}
 
-I will give you the following information:
-Two images:
-  - Target page (the page we want to return to, which is the page before the action is executed). **Important: The red boxes in the target page mark the locations that were clicked to transition from the target page to the current page.**
-  - Current page (the page where the phone is now, the page after the action is executed, need to return to the target page from here)
+{feedback_prompt_section}
 
-Please provide your analysis in the following format in Chinese:
+## 你的任务
+根据以上**局部信息**（特别是当前界面截图、已尝试操作列表），决定下一步应该执行哪个操作。
 
-**当前任务描述：**
-[简要描述当前的任务是什么，从什么页面返回到什么页面]
+### 决策指导原则（按优先级顺序）：
+1.  **最高优先级：处理弹窗干扰**：首先检查截图，若有任何广告、升级提示或其他遮挡主要内容的弹窗，必须优先关闭。**这类弹窗出现时，背景通常会变暗或呈灰色。**
+    - **要做**：将注意力完全集中在弹窗内部，寻找并点击明确的关闭按钮（如“X”图标）、“跳过”、“以后再说”等。
+    - **禁止**：
+        - 绝对不要点击弹窗的主要内容或广告详情。
+        - **绝对不要点击弹窗背后变灰区域的任何控件**，因为它们通常是不可交互的，你的唯一目标是关闭弹窗。
 
-**返回操作：**
-[具体的返回操作描述]
+2.  **第二优先级：严禁离开App**：仔细检查元素，如果某个按钮或链接看起来会打开浏览器、应用商店或其他第三方App（例如，“了解更多”、“隐私政策”、“关注我们”等），**绝对不要点击它**。你的任务是探索当前App内部，而非外部链接。
 
-When analyzing, please consider:
-- The red boxes show the exact locations that were clicked in the target page
-- What operations were performed between PTG nodes (click, swipe, input, etc.)
-- What page transitions or state changes this operation might have caused
-- Infer the most appropriate return method based on the operation type
+3.  **第三优先级：高效探索新功能**：如果页面无干扰且无外跳风险，应优先探索**最有潜力**通往**核心功能新页面**的元素。
+    - **优先点击高价值目标**：
+        - **导航栏/标签栏**：屏幕底部或顶部的标签（如“首页”、“我的”、“设置”）是最高优先级的探索目标。
+        - **核心功能入口**：视觉上显眼、文字明确描述了某个功能的大按钮或列表项（如“查看详情”、“我的账户”、“发布作品”）。
+    - **避免无效点击**：
+        - **暂时忽略细微元素**：对于那些明显不具备导航功能的次要元素（如状态开关、复选框、装饰性小图标、纯展示性文本），可以选择不点击，以加快探索速度。
+        - **严禁重复**：**绝对不要**点击在当前页“已尝试操作”列表中已有的**相同或功能相似**的元素。
 
-Please provide concise and clear descriptions in Chinese."""
+4.  **第四优先级：判断探索终点并返回**：如果当前页面上所有高价值的、看起来可导航的元素均已尝试，或者剩下的元素明显不重要，那么**首选操作应该是 `点击返回按钮`**。这可以避免在当前分支无效停留，从而去探索App的其他部分。
+
+5.  **特殊流程：处理输入框**：
+    - **第一步：激活输入框**：如果截图中**没有**键盘，下一步**必须是** `点击` 目标输入框。
+    - **第二步：输入文字**：只有当截图中**已出现**键盘，下一步**才应该是** `输入` 示例文字。
+    - **核心规则**：严禁在没有键盘时直接生成“输入”指令。
+
+## 输出指令
+**请只用一句话返回你决定要执行的下一步操作的自然语言描述。**
+
+这个描述应该清晰、具体，能够让一个专门的操作模型准确理解并执行。请直接返回操作描述的文本，不要包含任何编号、JSON、Markdown标记或任何额外的解释。
+
+### 输出示例
+- 点击“我的账户”按钮
+- 点击底部“发现”标签
+- 点击关闭按钮
+- 点击标签为“搜索”的输入框
+- 在标签为“搜索”的输入框中输入“夏季连衣裙”
+- 向下滚动页面
+- 点击返回按钮
+
+现在，请仔细分析当前界面截图，并只返回一句话的操作描述。'''
+
+verify_operation_prompt = '''你是一位极其严谨细致的软件质量保证专家。你的任务是精确地分析一次UI自动化操作的结果。
+
+我将为你提供三个关键信息：
+1.  **操作前截图**：执行操作之前的应用界面。
+2.  **执行的操作**：一个描述刚刚执行了什么动作的文本。
+3.  **操作后截图**：执行操作之后的应用界面。
+
+你的目标是：判断这次操作是否有效，结果是否符合预期，并检测出任何潜在的界面或功能性Bug。
+
+---
+### 待分析的操作
+
+**执行的操作**: "{operation}"
+
+---
+### 分析与验证标准
+
+请你基于以下标准，对“操作前”和“操作后”的截图进行深入比对和分析。
+
+#### 1. 有效性分析
+-   首先，对比两张截图，**界面是否发生了任何可识别的变化**？
+-   如果界面完全没有变化，那么这次操作很可能是**无效**的（无响应）。
+
+#### 2. 预期符合度分析
+-   根据“执行的操作”（例如：“点击增加数量按钮”），推断出预期的结果（例如：购物车里的商品数量应该增加）。
+-   检查“操作后截图”是否真实地反映了这个预期的结果。
+
+#### 3. Bug检测
+请仔细检查“操作后截图”，查找是否存在以下几类常见的Bug：
+-   **功能性错误**:
+    -   **页面无响应**：点击了功能性按钮（如点赞、分享、返回、增加/减少数量）后，界面无任何反馈或相关数据未更新。
+    -   **功能失效**：视频无法播放（截图中有播放按钮但内容区仍是封面），或页面卡在“加载中”的状态（持续显示加载动画）。
+-   **界面UI错误**:
+    -   **页面错乱**：布局结构崩坏、元素堆叠。
+    -   **页面遮挡**：弹窗、广告或其他元素遮挡了核心内容区域。
+    -   **空白页**：导航后出现白屏或无内容的页面。
+-   **常识性逻辑错误**：
+    -   例如，点击了“+”号按钮，但旁边的数字没有增加。
+
+---
+### 输出你的最终裁决
+
+请将你的全部分析结果，严格按照下面的JSON格式进行总结。除了这个JSON对象，不要返回任何额外的解释、注释或文字。
+
+**JSON输出格式:**
+```json
+{{
+  "status": "<裁决状态>",
+  "message": "<对裁决的详细文字说明>"
+}}
+```
+
+**`<裁决状态>` 的可选值:**
+-   `"success"`: 操作有效，结果符合预期，且未发现任何明显Bug。
+-   `"failure"`: 操作无效，因为执行操作后界面完全没有发生变化或功能未响应。
+-   `"error"`: 操作虽然改变了界面，但导致了一个明确的Bug（请在message中说明具体是什么bug）。
+
+**`<对裁决的详细文字说明>` 的要求:**
+-   用一到两句话，清晰、简洁地总结你的发现。
+-   **若status为"failure"**, 明确指出操作无效是因为界面未变。例：“操作‘点击点赞按钮’失败，界面没有发生任何变化。”
+-   **若status为"error"**, 精准地描述你发现的Bug。例：“错误：点击‘+’按钮后，关联的数量文本没有更新。”
+-   **若status为"success"**, 简要确认操作成功。例：“成功：点击‘我的’标签后，页面正确跳转到了个人中心页。”
+
+现在，请开始分析。
+'''
 
 event_llm_prompt = """
 You are a GUI agent designed to follow instructions and interact with a user interface. Your task is to select the next action to perform based on the user's instruction and the current screen.
@@ -95,10 +172,11 @@ You are a GUI agent designed to follow instructions and interact with a user int
 ## Action Space
 Your **only** available actions are:
 - `click(point='<point>x y</point>')`: Clicks a specific coordinate on the screen.
-- `type(content='...')`: Types the given content. To submit after typing, append "\n".
+- `type(content='...')`: Types the given content. To submit after typing, append "\\n".
 - `scroll(point='<point>x y</point>', direction='down' or 'up' or 'right' or 'left')`: Scrolls the page from a starting point in a given direction.
 - `press_back()`: Simulates pressing the back button.
-- `finished(content='xxx')`: Use this ONLY when the task is fully complete. Use escape characters (\\', \\", \\n) for the content.
+- `noop()`: Use this action **ONLY** when no other action can be taken to make progress on the instruction. This is your way of returning an empty/stuck signal.
+- `finished(content='xxx')`: Use this **ONLY** when the task is fully complete. Use escape characters (\\', \\", \\n) for the content.
 
 ## Output Format
 You **MUST** return your response in the following format. The `Action:` line must be one of the functions from the Action Space.
@@ -113,61 +191,13 @@ Action: [A single action from the Action Space]
 - `Action: type(content='hello world\\n')`
 - `Action: scroll(point='<point>500 1200</point>', direction='down')`
 - `Action: press_back()`
+- `Action: noop()`
 - `Action: finished(content='Task complete.')`
+
+## Important Rule
+If, based on the instruction and the current screen, you determine that no suitable action can be taken to make progress, you **MUST** use the `noop()` action. Do not guess or perform a random action if you are stuck.
 
 ## User Instruction
 {instruction}
 """
 
-verify_same_page_prompt = """You are an interface recognition expert. Please compare two interface screenshots and determine whether they are the same interface.
-
-Focus on:
-1. Overall layout structure of the interface
-2. Position of main functional areas
-3. Layout of navigation elements
-
-Ignore:
-1. Specific text content
-2. Image content differences
-3. Data changes
-
-Please return the result in JSON format: {"is_same": true/false}"""
-
-explore_page_events_prompt = """You are a professional mobile UI automation testing expert.
-Please analyze the provided interface screenshot and identify ONLY the most important clickable elements that are very likely to cause page transitions or major interface changes.
-
-**Focus ONLY on these critical navigation elements:**
-1. **Primary navigation**: Main menu buttons, navigation drawers, tab bars, bottom navigation
-2. **Major functional buttons**: Search, Settings, Profile, Login/Register, Add/Create new content
-3. **Category/Section entries**: Buttons that lead to different main functional areas
-4. **Key content items**: Only the first item in lists that represents a different content category or leads to detail pages
-
-**STRICTLY EXCLUDE these elements:**
-- Decorative icons, images, or logos
-- Back buttons or any element that suggests returning to a previous screen (e.g., arrow icons)
-- Minor controls (volume, brightness, notifications toggle)
-- Voice input or microphone buttons
-- Advertisement banners or promotional content
-
-**Selection Strategy:**
-- Maximum 10 elements per interface
-- Only select elements with high confidence of causing page navigation
-- Prioritize elements that explore different functional areas of the application
-- Focus on primary user journeys and main application features
-
-**Output Format:**
-Please return the result in JSON format:
-{
-  "clickable_events": [
-    "Click the main navigation drawer button in the top-left corner",
-    "Click the Search button in the top-right corner",
-    "Click the Profile tab in the bottom navigation bar"
-  ]
-}
-
-Where:
-- clickable_events: List of clear and specific descriptions of the click action in English
-- Maximum 15 elements total
-- Only include elements that are almost certain to navigate to new pages/screens
-
-Please ensure the returned result is in valid JSON format and contains ONLY the most critical navigation elements."""

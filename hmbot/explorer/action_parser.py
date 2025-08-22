@@ -6,7 +6,7 @@ from loguru import logger
 class ActionParser:
     def __init__(self):
         self.supported_actions = {
-            'click', 'type', 'scroll', 'press_back', 'finished'
+            'click', 'type', 'scroll', 'press_back', 'finished', 'noop'
         }
     
     def parse_action_output(self, output_text, image_width, image_height):
@@ -68,6 +68,9 @@ class ActionParser:
             result.update(self._parse_scroll_action(action_text))
         elif action_type == "press_back":
             # press_back没有额外参数
+            pass
+        elif action_type == "noop":
+            # noop没有额外参数
             pass
         elif action_type == "finished":
             result.update(self._parse_finished_action(action_text))
