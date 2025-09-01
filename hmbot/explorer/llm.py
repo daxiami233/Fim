@@ -6,12 +6,21 @@ import os
 
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", max_retries=3, temperature=1.0) 
-# llm = ChatOpenAI(
-#     model=os.getenv("KIMI_MODEL"),
-#     base_url=os.getenv("KIMI_BASE_URL"),
-#     api_key=SecretStr(os.getenv("KIMI_API_KEY")),
-# )     
+# llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", max_retries=3, temperature=1.0) 
+llm_flash = ChatOpenAI(
+    model=os.getenv("GOOGLE_MODEL"),
+    base_url=os.getenv("GOOGLE_BASE_URL"),
+    api_key=SecretStr(os.getenv("GOOGLE_API_KEY")),
+    temperature=0,
+    max_retries=3
+)     
+llm_pro = ChatOpenAI(
+    model="gemini-2.5-flash-thinking",
+    base_url=os.getenv("GOOGLE_BASE_URL"),
+    api_key=SecretStr(os.getenv("GOOGLE_API_KEY")),
+    temperature=1.0,
+    max_retries=3
+) 
 uitars = ChatOpenAI(
     model=os.getenv("SPECIALIZED_MODEL"),
     base_url=os.getenv("SPECIALIZED_BASE_URL"),

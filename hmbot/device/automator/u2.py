@@ -42,7 +42,10 @@ class U2(Automator):
     def restart_app(self, app):
         self.stop_app(app)
         self.start_app(app)
-    
+
+    def start_app_by_bundle(self, bundle):
+        self._driver.app_start(bundle)
+
     def click(self, x, y):
         self.display_info(refresh=True)
         width = self._display_info.width
@@ -86,19 +89,21 @@ class U2(Automator):
         elif direction == SwipeDirection.DOWN :
             self.swipe(0.5, 0.5, 0.5, 0.5+scale)
 
-    def input(self, node, text):
-        u2_nodes = []
-        if len(node._compressed) == 0:
-            u2_nodes.append(self.identify(node=node, type='android.widget.EditText', enabled="true", focused="true"))
-        else:
-            for child in node._compressed:
-                u2_nodes.extend(self.identify(node=child, type='android.widget.EditText', enabled="true", focused="true"))
-        for u2_node in u2_nodes:
-            try:
-                u2_node.set_text(text)
-            except uiautomator2.UiObjectNotFoundError:
-                self.identify(node=node, type='android.widget.AutoCompleteTextView', enabled="true", focused="true").set_text(text)
+    # def input(self, node, text):
+    #     u2_nodes = []
+    #     if len(node._compressed) == 0:
+    #         u2_nodes.append(self.identify(node=node, type='android.widget.EditText', enabled="true", focused="true"))
+    #     else:
+    #         for child in node._compressed:
+    #             u2_nodes.extend(self.identify(node=child, type='android.widget.EditText', enabled="true", focused="true"))
+    #     for u2_node in u2_nodes:
+    #         try:
+    #             u2_node.set_text(text)
+    #         except uiautomator2.UiObjectNotFoundError:
+    #             self.identify(node=node, type='android.widget.AutoCompleteTextView', enabled="true", focused="true").set_text(text)
 
+    def input(self, text):
+        self._driver.send_keys(text, True)
 
     def dump_hierarchy(self, device):
         root = VHTParser._parse_adb_xml(self._driver.dump_hierarchy(compressed=True), device)._root

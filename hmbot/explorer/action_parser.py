@@ -6,30 +6,40 @@ from loguru import logger
 class ActionParser:
     def __init__(self):
         self.supported_actions = {
-            'click', 'type', 'scroll', 'press_back', 'finished', 'noop'
+            'click', 'long_click', 'type', 'scroll', 'press_back', 'finished',
         }
     
     def parse_action_output(self, output_text, image_width, image_height):
-        # 提取Thought部分
-        thought_match = re.search(r'Thought:(.*?)\nAction:', output_text, re.DOTALL)
+        # 1. Extract the Thought part (from "Thought:" to "Description:")
+        thought_match = re.search(r'Thought:(.*?)\nDescription:', output_text, re.DOTALL)
         thought = thought_match.group(1).strip() if thought_match else ""
         
-        # 提取Action部分
+        # 2. Extract the Description part (from "Description:" to "Status:")
+        description_match = re.search(r'Description:(.*?)\nStatus:', output_text, re.DOTALL)
+        description = description_match.group(1).strip() if description_match else ""
+        
+        # 3. Extract the Status part (from "Status:" to "Action:")
+        status_match = re.search(r'Status:(.*?)\nAction:', output_text, re.DOTALL)
+        status = status_match.group(1).strip() if status_match else "success"
+        
+        # 4. Extract the Action part
         action_match = re.search(r'Action:(.*?)(?:\n|$)', output_text, re.DOTALL)
         action_text = action_match.group(1).strip() if action_match else ""
         
-        # 初始化结果
+        # 5. Initialize the result dictionary with the new fields
         result = {
             "thought": thought,
+            "description": description,
+            "status": status,
             "action": "",
             "point": None,
             "content": None,
             "direction": None,
         }
         
-        # 解析具体的动作
+        # 6. Parse the specific action and update the result (this logic remains the same)
         parsed_action = self._parse_specific_action(action_text)
-        if parsed_action['point'] is not None:
+        if parsed_action.get('point') is not None:
             parsed_action['point'] = (
                 int(parsed_action['point'][0] / 1000 * image_width), 
                 int(parsed_action['point'][1] / 1000 * image_height)
@@ -62,15 +72,14 @@ class ActionParser:
         # 根据动作类型解析参数
         if action_type == "click":
             result.update(self._parse_click_action(action_text))
+        elif action_type == "long_click":
+            result.update(self._parse_long_click_action(action_text))
         elif action_type == "type":
             result.update(self._parse_type_action(action_text))
         elif action_type == "scroll":
             result.update(self._parse_scroll_action(action_text))
         elif action_type == "press_back":
             # press_back没有额外参数
-            pass
-        elif action_type == "noop":
-            # noop没有额外参数
             pass
         elif action_type == "finished":
             result.update(self._parse_finished_action(action_text))
@@ -93,7 +102,24 @@ class ActionParser:
                 result["point"] = coordinates
         
         return result
-    
+
+    def _parse_long_click_action(self, action_text: str) -> Dict[str, Any]:
+        """
+        解析长按动作
+        格式: long_click(point='<point>x1 y1</point>')
+        """
+        result = {}
+
+        # 提取point参数
+        point_match = re.search(r'point=[\'"](.*?)[\'"]', action_text)
+        if point_match:
+            point_str = point_match.group(1)
+            coordinates = self._extract_coordinates_from_point(point_str)
+            if coordinates:
+                result["point"] = coordinates
+
+        return result
+
     def _parse_type_action(self, action_text: str) -> Dict[str, Any]:
         """
         解析输入动作

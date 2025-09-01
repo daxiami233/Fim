@@ -48,7 +48,10 @@ class Device(object):
 
     def restart_app(self, app):
         self.automator.restart_app(app)
-    
+
+    def start_app_by_bundle(self, bundle):
+        self.automator.start_app_by_bundle(bundle)
+
     def click(self, x, y):
         return self.automator.click(x, y)
 
@@ -72,8 +75,8 @@ class Device(object):
     def swipe_ext(self, direction: Union[SwipeDirection, str]):
         return self.automator.swipe_ext(direction)
     
-    def input(self, node, text):
-        return self.automator.input(node, text)
+    def input(self, text):
+        return self.automator.input(text)
 
     def dump_hierarchy(self, device=None):
         if device is None:
